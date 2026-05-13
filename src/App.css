@@ -1,0 +1,70 @@
+.logo.vite:hover {
+  filter: drop-shadow(0 0 2em #747bff);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafb);
+}
+
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  color: #0f0f0f;
+  background-color: transparent;
+}
+
+body {
+  margin: 0;
+  background-color: transparent !important;
+  overflow: hidden;
+}
+
+.container {
+  margin: 0;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pet {
+  font-size: 5rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  transition: transform 0.2s;
+  animation: float 3s ease-in-out infinite;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  -webkit-user-drag: none;
+}
+
+/* 彻底禁用任何元素的选中状态和选中时的蓝色高亮 */
+::selection {
+  background: transparent;
+}
+::-moz-selection {
+  background: transparent;
+}
+
+.pet:active {
+  transform: scale(0.9);
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f6f6;
+  }
+}
