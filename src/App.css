@@ -1,3 +1,9 @@
+#root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  color: #0f0f0f;
+  background-color: transparent;
+}
+
 .logo.vite:hover {
   filter: drop-shadow(0 0 2em #747bff);
 }
@@ -35,7 +41,6 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   transition: transform 0.2s;
-  animation: float 3s ease-in-out infinite;
   display: flex;
   justify-content: center;
   align-items: center;
