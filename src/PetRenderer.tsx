@@ -1,82 +1,97 @@
-import React, { useRef, useEffect } from 'react';
-import { Application, Text, TextStyle } from 'pixi.js';
+import React, { useEffect, useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 interface PetRendererProps {
   currentState: string;
 }
 
-export const PetRenderer: React.FC<PetRendererProps> = ({ currentState }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const appRef = useRef<Application | null>(null);
+// 彻底放弃 Suspense，使用原生的 useState + GLTFLoader 防止 Suspense 卡死并捕获具体报错
+const PetModel: React.FC<{ currentState: string }> = ({ currentState }) => {
+  const [modelScene, setModelScene] = useState<THREE.Group | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [progress, setProgress] = useState("0%");
 
   useEffect(() => {
-    const initPixi = async () => {
-      if (!canvasRef.current) return;
+    const loader = new GLTFLoader();
+    // 我们换回没有进行过 meshopt 压缩的纯几何体模型（dog_tiny_simplified.glb），因为 gltf-transform optimize 默认加了 meshopt 压缩导致 Threejs 需要额外的解码器配置
+    loader.load(
+      '/assets/dog_tiny_simplified.glb',
+      (gltf) => {
+        console.log("加载成功！", gltf);
+        
+        // 我们手动计算它的大小并把它缩小/居中，防止它太大以至于摄像机在它肚子里
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        
+        // 把模型的几何中心移到原点
+        gltf.scene.position.x = -center.x;
+        gltf.scene.position.y = -center.y;
+        gltf.scene.position.z = -center.z;
+        
+        // 算出最大的一边，强行把模型缩放到只占画面 2 个单位大小
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim > 0) {
+            const scale = 2 / maxDim; // 恢复刚才正好的完美大小
+            gltf.scene.scale.setScalar(scale);
+            gltf.scene.position.multiplyScalar(scale);
+        }
 
-      const app = new Application();
-      await app.init({
-        canvas: canvasRef.current,
-        width: 150,
-        height: 150,
-        backgroundAlpha: 0, // 彻底透明化 WebGL 背景
-        antialias: true
-      });
-      appRef.current = app;
+        // 仅保留稍微侧身的效果让我们能看出立体感，去掉破坏画面的垂直下降
+        gltf.scene.rotation.y = -Math.PI / 8;
 
-      // TODO: 这里是未来集成 Spine / Live2D 的骨骼绑定原点
-      // await Assets.load('pet-model.json');
-      // const pet = new Spine(skeletonData);
-      
-      // 当前：我们用 Pixi 内置的文本/图形渲染占位，模拟骨骼状态切换
-      const style = new TextStyle({
-        fontSize: 60,
-        align: 'center',
-      });
-      
-      const petSprite = new Text({ text: "😺", style });
-      petSprite.anchor.set(0.5);
-      // 放置到画布正中心
-      petSprite.x = app.screen.width / 2;
-      petSprite.y = app.screen.height / 2;
-
-      app.stage.addChild(petSprite);
-
-      // 实现呼吸动画渲染循环
-      let tick = 0;
-      app.ticker.add(() => {
-        tick += 0.05;
-        petSprite.y = app.screen.height / 2 + Math.sin(tick) * 5; // 上下呼吸浮动
-      });
-    };
-
-    initPixi();
-
-    return () => {
-      if (appRef.current) {
-        appRef.current.destroy(false, { children: true });
-        appRef.current = null;
+        setModelScene(gltf.scene);
+      },
+      (xhr) => {
+        const percent = Math.round((xhr.loaded / xhr.total) * 100);
+        setProgress(`${percent}%`);
+      },
+      (err: any) => {
+        console.error("加载出错了：", err);
+        setErrorMsg(err.message || String(err));
       }
-    };
+    );
   }, []);
 
-  // 监听 XState 传来的状态变更，动态驱动 WebGL 画布内容更新
-  useEffect(() => {
-    if (!appRef.current) return;
-    
-    // 拿到场景内的那个根元素（未来这将是执行 pet.state.setAnimation(...) 代码的地方）
-    const petSprite = appRef.current.stage.children[0] as Text;
-    if (!petSprite) return;
+  if (errorMsg) {
+    return (
+      <Html center>
+        <div style={{ color: "white", backgroundColor: "red", padding: "10px", fontSize: "12px", whiteSpace: "nowrap" }}>
+          模型解析失败: {errorMsg}
+        </div>
+      </Html>
+    );
+  }
 
-    switch (currentState) {
-      case 'idle': petSprite.text = "😺"; break;
-      case 'eating': petSprite.text = "🍗"; break;
-      case 'drinking': petSprite.text = "💧"; break;
-      case 'sleeping': petSprite.text = "💤"; break;
-      case 'petting': petSprite.text = "😽"; break;
-      case 'belly': petSprite.text = "😻"; break;
-      default: petSprite.text = "😺"; break;
-    }
-  }, [currentState]);
+  if (!modelScene) {
+    return (
+      <Html center zIndexRange={[100, 0]}>
+        <div style={{ color: "white", backgroundColor: "rgba(0,0,0,0.8)", padding: "10px", borderRadius: "8px", fontSize: "16px", whiteSpace: "nowrap" }}>
+          Loading: {progress}
+        </div>
+        {/* 放一个临时的红色小方块证明 3D 引擎本身没挂 */}
+      </Html>
+    );
+  }
 
-  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', outline: 'none' }} />;
+  return <primitive object={modelScene} />;
+};
+
+export const PetRenderer: React.FC<PetRendererProps> = ({ currentState }) => {
+  return (
+    <div style={{ width: '100%', height: '100%', outline: 'none', background: "transparent" }}>
+      <Canvas
+        camera={{ position: [0, 0, 5], fov: 50, near: 0.1, far: 1000 }} // 恢复最完美的中立摄像机视距
+        gl={{ alpha: true, antialias: true }} 
+      >
+        <ambientLight intensity={1.5} />
+        <directionalLight position={[5, 10, 5]} intensity={2} castShadow />
+
+        <PetModel currentState={currentState} />
+      </Canvas>
+    </div>
+  );
 };
